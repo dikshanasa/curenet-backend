@@ -32,14 +32,11 @@ const getArticleContent = async (url) => {
   try {
     console.log(`[SCRAPING] Fetching content from URL: ${url}`);
 
-    browser = await puppeteer.launch({ headless: true });
-    const page = await browser.newPage();
-
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-
-    const content = await page.evaluate(() => {
-      return document.body.innerText;
+    browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
     });
+    
 
     console.log(`[SCRAPING] Extracted content length for ${url}: ${content.length}`);
 
