@@ -33,10 +33,18 @@ const getArticleContent = async (url) => {
     console.log(`[SCRAPING] Fetching content from URL: ${url}`);
 
     browser = await puppeteer.launch({
+      headless: 'new',  // Use Puppeteer's recommended headless mode
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+      executablePath: puppeteer.executablePath(), // Use Puppeteer's Chromium
     });
-    
+
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+    // Extract article content using a simple selector
+    const content = await page.evaluate(() => {
+      return document.body.innerText || '';
+    });
 
     console.log(`[SCRAPING] Extracted content length for ${url}: ${content.length}`);
 
