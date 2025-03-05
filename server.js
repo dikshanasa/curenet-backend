@@ -4,17 +4,15 @@ const getModelResponse = require('./ragModel');
 const { processResponse } = require('./nlp');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
-
 const cors = require('cors');
-const app = express();
+
+const app = express();  // ✅ Fixed: Initialized express app
 
 const corsOptions = {
   origin: 'https://curenetmedi.netlify.app',
   optionsSuccessStatus: 200
 };
-
 app.use(cors(corsOptions));
-
 app.use(express.json());
 
 // Initialize Gemini API
@@ -25,10 +23,9 @@ async function isMedicalQuery(query) {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const prompt = `Determine if the following query is medical-related. Respond with 'yes' or 'no':\n\nQuery: ${query}\n\nIs this medical-related?`;
-    const result = await model.generateContent({
-      contents: [{ parts: [{ text: prompt }] }]
-    });
-    const response = await result.response;
+    
+    const result = await model.generateContent(prompt); // ✅ Fixed model call
+    const response = result.response;
     const text = response.text();
     return text.trim().toLowerCase() === 'yes';
   } catch (error) {

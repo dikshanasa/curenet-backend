@@ -1,0 +1,10 @@
+"Chromium Shortcut" = "Chromium Kısayolu";
+CFBundleGetInfoString = "Google Chrome for Testing 133.0.6943.141, Telif hakkı 2025 Google LLC. Tüm hakları saklıdır.";
+NSBluetoothAlwaysUsageDescription = "Chromium erişim izni aldıktan sonra, web siteleri de erişim için sizden izin isteyebilecek.";
+NSBluetoothPeripheralUsageDescription = "Chromium erişim izni aldıktan sonra, web siteleri de erişim için sizden izin isteyebilecek.";
+NSCameraUsageDescription = "Chromium erişim izni aldıktan sonra, web siteleri de erişim için sizden izin isteyebilecek.";
+NSHumanReadableCopyright = "Telif hakkı 2025 Google LLC. Tüm hakları saklıdır.";
+NSLocalNetworkUsageDescription = "Böylece, kullanılabilir cihazlar arasından seçiminizi yapıp içerikleri bu cihazlarda görüntüleyebilirsiniz.";
+NSLocationUsageDescription = "Chromium erişim izni aldıktan sonra, web siteleri de erişim için sizden izin isteyebilecek.";
+NSMicrophoneUsageDescription = "Chromium erişim izni aldıktan sonra, web siteleri de erişim için sizden izin isteyebilecek.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Chromium erişim izni aldıktan sonra, web siteleri de erişim için sizden izin isteyebilecek.";
