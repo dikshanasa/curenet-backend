@@ -15,7 +15,7 @@ const PUPPETEER_OPTIONS = {
     '--no-zygote'
   ],
   headless: 'new',
-  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/opt/render/.cache/puppeteer/chromium/chrome-linux64/chrome'
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome'
 };
 
 const getSearchResults = async (query, location) => {

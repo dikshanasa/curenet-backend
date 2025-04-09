@@ -5,8 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "npm install && npx puppeteer install chromium",
-    "postinstall": "npx puppeteer install chromium"
+    "build": "npm install"
   },
   "keywords": [],
   "author": "",
