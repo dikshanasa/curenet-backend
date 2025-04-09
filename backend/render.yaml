@@ -3,30 +3,43 @@ services:
     name: curenet-backend
     env: node
     buildCommand: |
+      echo "=== Starting build process ==="
+      
       # Install Chrome dependencies
+      echo "=== Installing Chrome dependencies ==="
       apt-get update
       apt-get install -y wget gnupg ca-certificates
       
       # Add Chrome repository
+      echo "=== Adding Chrome repository ==="
       wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
       echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
       
       # Install Chrome and fonts
+      echo "=== Installing Chrome and fonts ==="
       apt-get update
       apt-get install -y google-chrome-stable fonts-freefont-ttf
       
       # Create Chrome cache directory
+      echo "=== Setting up Chrome cache directory ==="
       mkdir -p /opt/render/.cache/puppeteer/chrome
+      ls -la /opt/render/.cache/puppeteer/chrome
       
       # Install specific Chrome version for Puppeteer
+      echo "=== Installing Puppeteer Chrome ==="
       npx puppeteer browsers install chrome@109.0.5414.120
       
       # Set up Chrome executable
+      echo "=== Setting up Chrome executable ==="
       ln -sf /usr/bin/google-chrome /opt/render/.cache/puppeteer/chrome/chrome
       chmod -R o+rx /opt/render/.cache/puppeteer
+      ls -la /opt/render/.cache/puppeteer/chrome
       
       # Install npm dependencies
+      echo "=== Installing npm dependencies ==="
       npm install
+      
+      echo "=== Build process completed ==="
     startCommand: node server.js
     envVars:
       - key: NODE_ENV
@@ -41,6 +54,8 @@ services:
         value: /opt/render/.cache/puppeteer/chrome/chrome
       - key: PUPPETEER_PRODUCT
         value: chrome
+      - key: DEBUG
+        value: puppeteer:*
     healthCheckPath: /health
     autoDeploy: true
     disk:

@@ -1,6 +1,8 @@
 const axios = require('axios');
 const puppeteer = require('puppeteer');
 const { GOOGLE_API_KEY, GOOGLE_CSE_ID } = require('./utils/config');
+const fs = require('fs');
+const path = require('path');
 
 // Configure Puppeteer for Render
 const PUPPETEER_OPTIONS = {
@@ -31,34 +33,75 @@ const PUPPETEER_OPTIONS = {
   }
 };
 
+// Log environment variables
+console.log('[SCRAPING] Environment variables:');
+console.log(`[SCRAPING] PUPPETEER_EXECUTABLE_PATH: ${process.env.PUPPETEER_EXECUTABLE_PATH}`);
+console.log(`[SCRAPING] CHROME_PATH: ${process.env.CHROME_PATH}`);
+console.log(`[SCRAPING] PUPPETEER_CACHE_DIR: ${process.env.PUPPETEER_CACHE_DIR}`);
+console.log(`[SCRAPING] PUPPETEER_PRODUCT: ${process.env.PUPPETEER_PRODUCT}`);
+
 // Verify Chrome installation
 const verifyChromeInstallation = async () => {
   try {
-    console.log('[SCRAPING] Verifying Chrome installation...');
+    console.log('[SCRAPING] Starting Chrome verification...');
     console.log('[SCRAPING] Chrome path:', PUPPETEER_OPTIONS.executablePath);
     
     // Check if Chrome exists
-    const fs = require('fs');
     if (!fs.existsSync(PUPPETEER_OPTIONS.executablePath)) {
       console.error('[SCRAPING] Chrome executable not found at:', PUPPETEER_OPTIONS.executablePath);
-      return false;
+      console.log('[SCRAPING] Checking alternative locations...');
+      
+      const possiblePaths = [
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/opt/google/chrome/chrome',
+        '/opt/google/chrome/google-chrome'
+      ];
+      
+      for (const path of possiblePaths) {
+        console.log(`[SCRAPING] Checking ${path}...`);
+        if (fs.existsSync(path)) {
+          console.log(`[SCRAPING] Found Chrome at ${path}`);
+          PUPPETEER_OPTIONS.executablePath = path;
+          break;
+        }
+      }
+      
+      if (!fs.existsSync(PUPPETEER_OPTIONS.executablePath)) {
+        console.error('[SCRAPING] Chrome not found in any standard location');
+        return false;
+      }
     }
     
+    console.log('[SCRAPING] Chrome executable found, checking permissions...');
+    const stats = fs.statSync(PUPPETEER_OPTIONS.executablePath);
+    console.log(`[SCRAPING] Chrome permissions: ${stats.mode.toString(8)}`);
+    
+    console.log('[SCRAPING] Attempting to launch Chrome...');
     const browser = await puppeteer.launch(PUPPETEER_OPTIONS);
     const version = await browser.version();
     console.log('[SCRAPING] Chrome version:', version);
     
+    console.log('[SCRAPING] Testing Chrome functionality...');
+    const page = await browser.newPage();
+    await page.goto('about:blank');
+    console.log('[SCRAPING] Chrome page load successful');
+    
+    await page.close();
     await browser.close();
     console.log('[SCRAPING] Chrome installation verified successfully');
     return true;
   } catch (error) {
     console.error('[SCRAPING] Chrome verification failed:', error.message);
+    console.error('[SCRAPING] Error stack:', error.stack);
     return false;
   }
 };
 
 // Initialize Chrome verification
-verifyChromeInstallation().catch(console.error);
+verifyChromeInstallation().catch(error => {
+  console.error('[SCRAPING] Chrome verification failed with error:', error);
+});
 
 const getSearchResults = async (query, location) => {
   try {
