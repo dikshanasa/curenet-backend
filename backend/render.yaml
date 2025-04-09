@@ -6,7 +6,7 @@ services:
     startCommand: node server.js
     envVars:
       - key: PUPPETEER_EXECUTABLE_PATH
-        value: /opt/render/.cache/puppeteer/chrome/linux-135.0.7049.42/chrome-linux64/chrome
+        value: /opt/render/.cache/puppeteer/chromium/chrome-linux64/chrome
       - key: NODE_ENV
         value: production
     healthCheckPath: /health

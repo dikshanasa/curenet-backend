@@ -5,8 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "npm install && PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install puppeteer && npx puppeteer browsers install chrome",
-    "postinstall": "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install puppeteer"
+    "build": "npm install && npx puppeteer install chromium",
+    "postinstall": "npx puppeteer install chromium"
   },
   "keywords": [],
   "author": "",
@@ -19,7 +19,7 @@
     "dotenv": "^16.4.1",
     "express": "^4.18.2",
     "natural": "^6.10.3",
-    "puppeteer": "^22.0.0"
+    "puppeteer": "21.7.0"
   },
   "engines": {
     "node": ">=18.0.0"

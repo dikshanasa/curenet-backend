@@ -11,9 +11,11 @@ const PUPPETEER_OPTIONS = {
     '--disable-accelerated-2d-canvas',
     '--disable-gpu',
     '--window-size=1920x1080',
+    '--single-process',
+    '--no-zygote'
   ],
   headless: 'new',
-  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/opt/render/.cache/puppeteer/chromium/chrome-linux64/chrome'
 };
 
 const getSearchResults = async (query, location) => {
