@@ -24,6 +24,19 @@ const PUPPETEER_OPTIONS = {
   }
 };
 
+// Verify Chrome installation
+const verifyChromeInstallation = async () => {
+  try {
+    const browser = await puppeteer.launch(PUPPETEER_OPTIONS);
+    await browser.close();
+    console.log('[SCRAPING] Chrome installation verified successfully');
+    return true;
+  } catch (error) {
+    console.error('[SCRAPING] Chrome verification failed:', error.message);
+    return false;
+  }
+};
+
 const getSearchResults = async (query, location) => {
   try {
     const apiKey = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
