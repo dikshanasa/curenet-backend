@@ -1,6 +1,6 @@
 const natural = require('natural');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const tf = require('@tensorflow/tfjs-node');
+const tf = require('@tensorflow/tfjs');
 const use = require('@tensorflow-models/universal-sentence-encoder');
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
@@ -22,188 +22,30 @@ const GENERATION_CONFIG = {
   maxOutputTokens: 2048,
 };
 
-// Initialize TensorFlow.js with Node backend
-tf.setBackend('tensorflow');
-
-// Optimize memory settings for Node.js
-tf.ENV.set('CPU_HANDOFF_SIZE_THRESHOLD', 0);
-tf.ENV.set('WEBGL_CPU_FORWARD', true);
-
-// Enhanced caching with TTL
-const embeddingCache = new Map();
-const CACHE_TTL = 3600000; // 1 hour
-
-let sentenceEncoder = null;
+let model;
 async function loadModel() {
-  if (sentenceEncoder) return;
-
   try {
-    sentenceEncoder = await use.load();
+    model = await use.load();
     console.log('[RAGMODEL] Universal Sentence Encoder model loaded successfully');
   } catch (error) {
     console.error('[RAGMODEL] Error loading Universal Sentence Encoder:', error);
     throw new Error('Failed to load Universal Sentence Encoder model');
   }
 }
-
-// Initialize model on startup
 loadModel();
 
-// Enhanced conversation context tracking
-const conversationContext = {
-  currentTopic: null,
-  lastQuery: null,
-  topicConfidence: 0,
-  contextWindow: 5,
-  messageHistory: [],
-  topicKeywords: new Set() // Track keywords related to the current topic
-};
-
-// Function to extract main topic from text
-function extractMainTopic(text) {
-  // Medical-specific stop words
-  const stopWords = new Set([
-    'what', 'are', 'the', 'symptoms', 'of', 'treatment', 'for', 'how', 'to',
-    'diagnose', 'cure', 'prevent', 'manage', 'handle', 'deal', 'with', 'latest',
-    'research', 'researches', 'medications', 'drugs', 'therapy', 'therapies'
-  ]);
-  
-  // Split text into words and clean
-  const words = text.toLowerCase()
-    .replace(/[^\w\s]/g, '')
-    .split(/\s+/)
-    .filter(word => !stopWords.has(word) && word.length > 2);
-  
-  // Count word frequencies
-  const wordFreq = {};
-  words.forEach(word => {
-    wordFreq[word] = (wordFreq[word] || 0) + 1;
-  });
-  
-  // Find most frequent word that's not a stop word
-  let maxFreq = 0;
-  let mainTopic = null;
-  
-  for (const [word, freq] of Object.entries(wordFreq)) {
-    if (freq > maxFreq) {
-      maxFreq = freq;
-      mainTopic = word;
-    }
-  }
-  
-  return mainTopic;
-}
-
-// Function to update conversation context
-function updateConversationContext(query) {
-  // Extract potential topic from current query
-  const potentialTopic = extractMainTopic(query);
-  
-  // If we have a previous topic, check if the new query is related
-  if (conversationContext.currentTopic) {
-    const queryWords = new Set(query.toLowerCase().split(/\s+/));
-    const topicWords = new Set(conversationContext.currentTopic.toLowerCase().split(/\s+/));
-    
-    // Calculate overlap between query and current topic
-    const overlap = [...queryWords].filter(word => topicWords.has(word)).length;
-    const topicConfidence = overlap / Math.max(queryWords.size, topicWords.size);
-    
-    // Update context if confidence is high enough or if the query contains topic keywords
-    if (topicConfidence > 0.3 || [...queryWords].some(word => conversationContext.topicKeywords.has(word))) {
-      conversationContext.topicConfidence = topicConfidence;
-      console.log(`[RAGMODEL] Maintaining context: ${conversationContext.currentTopic}`);
-      return conversationContext.currentTopic;
-    }
-  }
-  
-  // If no strong connection to current topic, update with new topic
-  conversationContext.currentTopic = potentialTopic;
-  conversationContext.lastQuery = query;
-  conversationContext.topicConfidence = 0.8;
-  
-  // Update topic keywords
-  const queryWords = new Set(query.toLowerCase().split(/\s+/));
-  conversationContext.topicKeywords = new Set([...queryWords].filter(word => word.length > 2));
-  
-  conversationContext.messageHistory.push({
-    query,
-    topic: potentialTopic,
-    timestamp: Date.now()
-  });
-  
-  // Keep only recent messages in history
-  if (conversationContext.messageHistory.length > conversationContext.contextWindow) {
-    conversationContext.messageHistory.shift();
-  }
-  
-  console.log(`[RAGMODEL] New context topic: ${potentialTopic}`);
-  return potentialTopic;
-}
-
-// Function to enhance query with context
-function enhanceQueryWithContext(query) {
-  const currentTopic = updateConversationContext(query);
-  
-  if (currentTopic && conversationContext.topicConfidence > 0.3) {
-    console.log(`[RAGMODEL] Using conversation context: ${currentTopic} (confidence: ${conversationContext.topicConfidence.toFixed(2)})`);
-    
-    // Always include the current topic in the search query
-    const topicWords = currentTopic.toLowerCase().split(/\s+/);
-    const queryWords = query.toLowerCase().split(/\s+/);
-    
-    // Check if the topic is already in the query
-    const hasTopic = topicWords.some(word => queryWords.includes(word));
-    
-    if (!hasTopic) {
-      // Add the topic to the query
-      return `${query} about ${currentTopic}`;
-    }
-  }
-  
-  return query;
-}
-
-// Modern utility functions to replace deprecated ones
-const isNullOrUndefined = (value) => value === null || value === undefined;
-const isArray = (value) => Array.isArray(value);
-
 function preprocessText(text) {
-  if (isNullOrUndefined(text) || typeof text !== 'string') {
+  if (!text || typeof text !== 'string') {
     console.warn('[RAGMODEL] Invalid text input for preprocessing');
     return '';
   }
 
   console.log('[RAGMODEL] Preprocessing text...');
-  
-  // First, remove HTML tags and decode HTML entities
-  let cleanedText = text
-    .replace(/<[^>]*>/g, ' ') // Remove HTML tags
-    .replace(/&nbsp;/g, ' ') // Replace non-breaking spaces
-    .replace(/&[^;]+;/g, ' ') // Replace other HTML entities
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .trim();
-
-  // Remove navigation, menus, and other common web elements
-  cleanedText = cleanedText
+  const cleanedText = text
     .replace(/Navigation[\s\S]*?(Menu|Search)/gi, '')
     .replace(/\b(Privacy Policy|Terms & Conditions|Legal|Contact Us|About Us|Advertisements)\b/gi, '')
-    .replace(/\b(Copyright|All Rights Reserved|©)\b/gi, '')
-    .replace(/\b(Home|Back|Next|Previous|Close|Menu|Search|Login|Sign Up)\b/gi, '')
-    .replace(/\[.*?\]/g, '') // Remove text in square brackets
-    .replace(/\(.*?\)/g, '') // Remove text in parentheses
-    .replace(/\s+/g, ' ') // Normalize whitespace again
-    .trim();
-
-  // Remove special characters but keep basic punctuation and medical terms
-  cleanedText = cleanedText
-    .replace(/[^\w\s.,!?\-()/]/g, '') // Keep basic punctuation and medical terms
-    .replace(/\s+/g, ' ') // Final whitespace normalization
-    .trim();
-
-  // Remove any remaining HTML-like content
-  cleanedText = cleanedText
-    .replace(/DOCTYPE|html|head|body|meta|link|script|style|div|span|class|id|src|href|alt|title/gi, '')
     .replace(/\s+/g, ' ')
+    .replace(/[^\w\s.,!?-]/g, '') // Remove special characters except basic punctuation
     .trim();
 
   console.log(`[RAGMODEL] Preprocessed text length: ${cleanedText.length}`);
@@ -215,39 +57,23 @@ function preprocessText(text) {
 }
 
 function chunkText(text, maxLength = 1000) {
-  if (isNullOrUndefined(text)) {
-    console.warn('[RAGMODEL] Invalid text input for chunking');
-    return [];
-  }
+  if (!text) return [];
   
   console.log('[RAGMODEL] Chunking content...');
   const chunks = [];
   const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
   let currentChunk = '';
-  const minChunkSize = 500; // Minimum chunk size to ensure meaningful content
 
   for (const sentence of sentences) {
     if ((currentChunk.length + sentence.length) <= maxLength) {
       currentChunk += sentence + ' ';
     } else {
-      if (currentChunk.length >= minChunkSize) {
-        chunks.push(currentChunk.trim());
-        currentChunk = sentence + ' ';
-      } else {
-        // If current chunk is too small, try to add more sentences
-        currentChunk += sentence + ' ';
-      }
+      if (currentChunk) chunks.push(currentChunk.trim());
+      currentChunk = sentence + ' ';
     }
   }
 
-  // Add the last chunk if it meets minimum size
-  if (currentChunk.trim().length >= minChunkSize) {
-    chunks.push(currentChunk.trim());
-  } else if (chunks.length > 0) {
-    // If last chunk is too small, append it to the last chunk
-    chunks[chunks.length - 1] += ' ' + currentChunk.trim();
-  } else if (currentChunk.trim()) {
-    // If it's the only chunk, keep it regardless of size
+  if (currentChunk.trim()) {
     chunks.push(currentChunk.trim());
   }
 
@@ -259,128 +85,60 @@ function chunkText(text, maxLength = 1000) {
   return chunks;
 }
 
-// Function to generate content with Gemini
-async function generateContent(prompt) {
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const result = await model.generateContent({
-      contents: [{ parts: [{ text: prompt }]}],
-      generationConfig: GENERATION_CONFIG,
-      safetySettings: SAFETY_SETTINGS
-    });
-    return result;
-  } catch (error) {
-    console.error('[RAGMODEL] Error generating content:', error);
-    throw error;
-  }
-}
-
-// Rate limiting for Gemini API
-const RATE_LIMIT = {
-  requestsPerMinute: 15,
-  lastRequestTime: 0,
-  requestQueue: []
-};
-
-async function rateLimitedGenerateContent(prompt) {
-  const now = Date.now();
-  const timeSinceLastRequest = now - RATE_LIMIT.lastRequestTime;
-  
-  if (timeSinceLastRequest < 60000 / RATE_LIMIT.requestsPerMinute) {
-    // Queue the request
-    return new Promise((resolve) => {
-      RATE_LIMIT.requestQueue.push(() => {
-        setTimeout(async () => {
-          const result = await generateContent(prompt);
-          resolve(result);
-        }, 60000 / RATE_LIMIT.requestsPerMinute);
-      });
-    });
-  }
-  
-  RATE_LIMIT.lastRequestTime = now;
-  return generateContent(prompt);
-}
-
-// Optimized batch processing
-async function processBatch(chunks, queryEmbedding, startIndex, batchSize, query) {
-  if (!isArray(chunks) || chunks.length === 0) {
-    console.warn('[RAGMODEL] Invalid chunks input for batch processing');
+async function scoreChunksByQuery(chunks, query) {
+  if (!chunks.length || !query) {
+    console.warn('[RAGMODEL] Invalid input for chunk scoring');
     return [];
   }
-  
-  const endIndex = Math.min(startIndex + batchSize, chunks.length);
-  const batchChunks = chunks.slice(startIndex, endIndex);
-  
-  if (!sentenceEncoder) {
-    await loadModel();
-  }
-  
-  // Get embeddings for batch
-  const embeddings = await sentenceEncoder.embed(batchChunks);
-  
-  // Calculate scores in parallel
-  const scores = await Promise.all(batchChunks.map(async (chunk, index) => {
-    const chunkEmbedding = embeddings.slice([index, 0], [1, -1]);
-    const semanticScore = tf.matMul(queryEmbedding, chunkEmbedding.transpose()).dataSync()[0];
-    
-    // Optimized keyword matching
-    const queryWords = new Set(query.toLowerCase().split(/\W+/).filter(Boolean));
-    const chunkWords = new Set(chunk.toLowerCase().split(/\W+/).filter(Boolean));
-    const matchingWords = [...queryWords].filter(word => chunkWords.has(word));
-    const keywordScore = matchingWords.length / Math.max(queryWords.size, 1);
-    
-    // Weighted scoring
-    return {
-      chunk,
-      score: (0.7 * semanticScore) + (0.3 * keywordScore)
-    };
-  }));
-  
-  return scores;
-}
 
-async function scoreChunksByQuery(chunks, query) {
-  console.log('[RAGMODEL] Starting scoring for', chunks.length, 'chunks');
-  const startTime = Date.now();
+  console.log('[RAGMODEL] Scoring chunks by query...');
   
-  // Get query embedding
-  const queryStart = Date.now();
-  const queryEmbedding = await sentenceEncoder.embed([query]);
-  console.log(`[RAGMODEL] Query embedding took ${Date.now() - queryStart}ms`);
-  
-  // Process chunks in batches
-  const batchSize = 12;
-  const scoredChunks = [];
-  let processedChunks = 0;
-  
-  for (let i = 0; i < chunks.length; i += batchSize) {
-    const batchStart = Date.now();
-    const batch = chunks.slice(i, i + batchSize);
-    console.log(`[RAGMODEL] Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(chunks.length/batchSize)}`);
+  try {
+    // Get embeddings for query and chunks using Universal Sentence Encoder
+    const textsToEmbed = [query, ...chunks];
+    const embeddings = await model.embed(textsToEmbed);
     
-    const batchScores = await processBatch(batch, queryEmbedding, i, batchSize, query);
-    scoredChunks.push(...batchScores);
+    // Extract query embedding and chunk embeddings
+    const queryEmbedding = embeddings.slice([0, 0], [1, -1]);
+    const chunkEmbeddings = embeddings.slice([1, 0], [chunks.length, -1]);
     
-    processedChunks += batch.length;
-    const batchTime = Date.now() - batchStart;
-    const estimatedTotalTime = (batchTime / batch.length) * chunks.length;
-    const remainingTime = estimatedTotalTime - (Date.now() - startTime);
+    // Calculate semantic similarity scores
+    const scores = chunks.map((chunk, index) => {
+      // Semantic similarity using cosine similarity
+      const chunkEmbedding = chunkEmbeddings.slice([index, 0], [1, -1]);
+      const semanticScore = 1 - tf.losses.cosineDistance(queryEmbedding, chunkEmbedding).arraySync();
+      
+      // Keyword matching score
+      const queryWords = new Set(query.toLowerCase().split(/\W+/).filter(Boolean));
+      const chunkWords = new Set(chunk.toLowerCase().split(/\W+/).filter(Boolean));
+      const matchingWords = [...queryWords].filter(word => chunkWords.has(word));
+      const keywordScore = matchingWords.length / queryWords.size;
+      
+      // Combined score
+      const combinedScore = (semanticScore + keywordScore) / 2;
+      
+      return {
+        chunk,
+        score: combinedScore,
+        semanticScore,
+        keywordScore
+      };
+    });
+
+    // Sort by combined score
+    const sortedScores = scores.sort((a, b) => b.score - a.score);
     
-    console.log(`[RAGMODEL] Batch ${Math.floor(i/batchSize) + 1} completed in ${batchTime}ms`);
-    console.log(`[RAGMODEL] Progress: ${processedChunks}/${chunks.length} chunks (${Math.round((processedChunks/chunks.length)*100)}%)`);
-    console.log(`[RAGMODEL] Estimated remaining time: ${Math.round(remainingTime/1000)}s`);
+    console.log('[RAGMODEL] Top 3 chunk scores:');
+    sortedScores.slice(0, 3).forEach((item, index) => {
+      console.log(`[RAGMODEL] Chunk ${index + 1} - Combined Score: ${item.score.toFixed(3)} (Semantic: ${item.semanticScore.toFixed(3)}, Keyword: ${item.keywordScore.toFixed(3)})`);
+    });
+
+    return sortedScores;
+  } catch (error) {
+    console.error('[RAGMODEL] Error in chunk scoring:', error);
+    // Fallback to basic keyword matching if embedding fails
+    return fallbackScoring(chunks, query);
   }
-  
-  // Sort chunks by score
-  const sortStart = Date.now();
-  scoredChunks.sort((a, b) => b.score - a.score);
-  console.log(`[RAGMODEL] Sorting took ${Date.now() - sortStart}ms`);
-  
-  const totalTime = Date.now() - startTime;
-  console.log(`[RAGMODEL] Total scoring time: ${totalTime}ms (${Math.round(totalTime/1000)}s)`);
-  
-  return scoredChunks;
 }
 
 function fallbackScoring(chunks, query) {
@@ -401,45 +159,54 @@ async function summarizeTopChunks(scoredChunks, topN = 10) {
     return [];
   }
 
-  console.log(`[RAGMODEL] Starting summary generation for top ${topN} chunks...`);
+  console.log(`[RAGMODEL] Summarizing top ${topN} chunks...`);
   const topChunks = scoredChunks.slice(0, topN);
   const summaries = [];
 
-  for (let i = 0; i < topChunks.length; i++) {
+  for (const { chunk } of topChunks) {
     try {
-      console.log(`[RAGMODEL] Generating summary for chunk ${i + 1}/${topN}`);
-      const summary = await generateSummary(topChunks[i].chunk);
-      if (summary) {
-        console.log(`[RAGMODEL] Successfully generated summary for chunk ${i + 1}`);
-        summaries.push(summary);
-      }
+      const summary = await generateSummary(chunk);
+      if (summary) summaries.push(summary);
     } catch (error) {
-      console.error(`[RAGMODEL] Error summarizing chunk ${i + 1}:`, error);
+      console.error('[RAGMODEL] Error summarizing chunk:', error);
       // Add original chunk as fallback
-      summaries.push(topChunks[i].chunk);
+      summaries.push(chunk);
     }
   }
 
-  console.log(`[RAGMODEL] Completed summary generation. Generated ${summaries.length} summaries`);
   return summaries;
 }
 
 async function generateSummary(chunk) {
+  if (!chunk) return null;
+  
+  console.log('[RAGMODEL] Generating summary for chunk...');
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+  const prompt = `Summarize this medical information concisely and accurately:
+
+${chunk}
+
+Provide a clear, factual summary focusing on key medical information.`;
+
   try {
-    console.log('[RAGMODEL] Initializing Gemini model for summary generation');
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const prompt = `Summarize the following medical text in 2-3 sentences, focusing on key information about treatments, symptoms, or medical conditions. Keep the summary concise and factual:\n\n${chunk}`;
-    
-    console.log('[RAGMODEL] Generating summary with Gemini');
-    const result = await rateLimitedGenerateContent(prompt);
+    const result = await model.generateContent({
+      contents: [{ parts: [{ text: prompt }]}],
+      generationConfig: GENERATION_CONFIG,
+      safetySettings: SAFETY_SETTINGS
+    });    
+
     const response = await result.response;
     const summary = response.text();
-    console.log(`[RAGMODEL] Generated summary length: ${summary.length} characters`);
-    return summary;
+    
+    if (summary) {
+      console.log(`[RAGMODEL] Generated summary length: ${summary.length} chars`);
+      return summary;
+    }
+    return chunk;
   } catch (error) {
     console.error('[RAGMODEL] Error in summary generation:', error);
-    // Return a simple summary based on the first few sentences
-    return chunk.split('. ').slice(0, 3).join('. ') + '.';
+    return chunk;
   }
 }
 
@@ -511,36 +278,52 @@ Contains relevant information (YES/NO):`;
 }
 
 async function calculateConfidence(query, megaChunk, answer) {
-  if (!sentenceEncoder) {
-    await loadModel();
+  if (!query || !megaChunk || !answer) {
+    console.warn('[RAGMODEL] Invalid input for confidence calculation');
+    return 0;
   }
 
+  console.log('[RAGMODEL] Calculating confidence score...');
   try {
-    // Get embeddings for query, mega chunk, and answer
-    const [queryEmbedding, chunkEmbedding, answerEmbedding] = await Promise.all([
-      sentenceEncoder.embed([query]),
-      sentenceEncoder.embed([megaChunk]),
-      sentenceEncoder.embed([answer])
-    ]);
+    // Token-based similarity
+    const queryTokens = new Set(query.toLowerCase().split(/\W+/).filter(Boolean));
+    const megaChunkTokens = new Set(megaChunk.toLowerCase().split(/\W+/).filter(Boolean));
+    const answerTokens = new Set(answer.toLowerCase().split(/\W+/).filter(Boolean));
 
-    // Calculate semantic similarities
-    const queryChunkSimilarity = tf.matMul(queryEmbedding, chunkEmbedding.transpose()).dataSync()[0];
-    const queryAnswerSimilarity = tf.matMul(queryEmbedding, answerEmbedding.transpose()).dataSync()[0];
-    const chunkAnswerSimilarity = tf.matMul(chunkEmbedding, answerEmbedding.transpose()).dataSync()[0];
+    const queryMegaOverlap = new Set([...queryTokens].filter(x => megaChunkTokens.has(x))).size / queryTokens.size;
+    const answerMegaOverlap = new Set([...answerTokens].filter(x => megaChunkTokens.has(x))).size / answerTokens.size;
 
-    // Calculate weighted average of similarities
-    const confidence = (0.4 * queryChunkSimilarity) + (0.4 * queryAnswerSimilarity) + (0.2 * chunkAnswerSimilarity);
+    // Semantic similarity using Universal Sentence Encoder
+    const embeddings = await model.embed([query, answer, megaChunk]);
+    const queryVec = embeddings.slice([0, 0], [1, -1]);
+    const answerVec = embeddings.slice([1, 0], [1, -1]);
+    const megaChunkVec = embeddings.slice([2, 0], [1, -1]);
+
+    const semanticSimilarity = 1 - tf.losses.cosineDistance(queryVec, answerVec).arraySync();
+    
+    // Calculate final confidence score
+    const weights = {
+      queryOverlap: 0.3,
+      answerOverlap: 0.3,
+      semantic: 0.4
+    };
+
+    const confidence = (
+      queryMegaOverlap * weights.queryOverlap +
+      answerMegaOverlap * weights.answerOverlap +
+      semanticSimilarity * weights.semantic
+    );
 
     console.log(`[RAGMODEL] Confidence components:
-      Query-Chunk similarity: ${queryChunkSimilarity.toFixed(3)}
-      Query-Answer similarity: ${queryAnswerSimilarity.toFixed(3)}
-      Chunk-Answer similarity: ${chunkAnswerSimilarity.toFixed(3)}
+      Query-Mega overlap: ${queryMegaOverlap.toFixed(3)}
+      Answer-Mega overlap: ${answerMegaOverlap.toFixed(3)}
+      Semantic similarity: ${semanticSimilarity.toFixed(3)}
       Final confidence: ${confidence.toFixed(3)}`);
 
-    return confidence;
+    return Math.round(confidence * 100) / 100;
   } catch (error) {
     console.error('[RAGMODEL] Error calculating confidence:', error);
-    return 0.5; // Return neutral confidence on error
+    return 0;
   }
 }
 
@@ -550,7 +333,7 @@ async function generateAnswer(query, context, isFullContext = false) {
     throw new Error('Invalid input for answer generation');
   }
 
-  console.log(`[RAGMODEL] Starting answer generation using ${isFullContext ? 'full context' : 'megachunk'}`);
+  console.log(`[RAGMODEL] Generating AI answer using ${isFullContext ? 'full context' : 'megachunk'}`);
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   const prompt = `As a medical information assistant, provide a comprehensive and accurate answer to the query based on the following context. 
@@ -565,7 +348,6 @@ Provide a clear, structured answer that directly addresses the query. Include on
 Answer:`;
 
   try {
-    console.log('[RAGMODEL] Generating answer with Gemini');
     const result = await model.generateContent({
       contents: [{ parts: [{ text: prompt }]}],
       generationConfig: {
@@ -578,7 +360,7 @@ Answer:`;
 
     const response = await result.response;
     const answer = response.text();
-    console.log(`[RAGMODEL] Successfully generated answer of length ${answer.length} characters`);
+    console.log(`[RAGMODEL] Generated answer length: ${answer.length} characters`);
     return answer;
   } catch (error) {
     console.error('[RAGMODEL] Error generating answer:', error);
@@ -586,7 +368,7 @@ Answer:`;
   }
 }
 
-async function getModelResponse(question, fullContext) {
+const getModelResponse = async (question, fullContext) => {
   try {
     console.log('\n[RAGMODEL] Starting new query processing...');
     console.log(`[RAGMODEL] Question: ${question}`);
@@ -605,28 +387,17 @@ async function getModelResponse(question, fullContext) {
     const scoredChunks = await scoreChunksByQuery(chunks, question);
     
     // Generate summaries and create megachunk
-    console.log('[RAGMODEL] Starting summary generation...');
     const summaries = await summarizeTopChunks(scoredChunks);
-    console.log(`[RAGMODEL] Generated ${summaries.length} summaries`);
-    
     const megaChunk = await createMegaChunk(summaries);
-    console.log(`[RAGMODEL] Created mega chunk of length ${megaChunk.length}`);
     
     // Check relevance and generate answer
-    console.log('[RAGMODEL] Checking relevance...');
     const isRelevant = await checkRelevance(question, megaChunk);
-    console.log(`[RAGMODEL] Relevance check result: ${isRelevant}`);
-    
     const contextToUse = isRelevant ? megaChunk : fullContext;
+    
     console.log(`[RAGMODEL] Using ${isRelevant ? 'megachunk' : 'full context'} for answer generation`);
     
-    console.log('[RAGMODEL] Generating answer...');
     const answer = await generateAnswer(question, contextToUse, !isRelevant);
-    console.log(`[RAGMODEL] Generated answer length: ${answer.length}`);
-    
-    console.log('[RAGMODEL] Calculating confidence...');
     const confidence = await calculateConfidence(question, megaChunk, answer);
-    console.log(`[RAGMODEL] Confidence score: ${confidence}`);
 
     // Prepare response metadata
     const metadata = {
@@ -640,7 +411,7 @@ async function getModelResponse(question, fullContext) {
     console.log('[RAGMODEL] Response generated successfully');
     console.log('[RAGMODEL] Metadata:', metadata);
 
-    const response = {
+    return {
       question,
       answer,
       confidence,
@@ -648,14 +419,11 @@ async function getModelResponse(question, fullContext) {
       usedFullContext: !isRelevant
     };
 
-    console.log('[RAGMODEL] Final response:', JSON.stringify(response, null, 2));
-    return response;
-
   } catch (error) {
     console.error('[RAGMODEL] Error in pipeline:', error);
     throw new Error(`Failed to process query: ${error.message}`);
   }
-}
+};
 
 // Export the main function and utility functions for testing
 module.exports = getModelResponse;

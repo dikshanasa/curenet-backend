@@ -16,5 +16,3 @@ services:
         value: "true"
       - key: PUPPETEER_EXECUTABLE_PATH
         value: "/usr/bin/google-chrome"
-      - key: NODE_ENV
-        value: "production"

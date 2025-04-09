@@ -7,18 +7,17 @@ require('dotenv').config();
 
 const cors = require('cors');
 const app = express();
-
 // CORS Configuration
 const corsOptions = {
-  origin: ['https://curenetmedi.netlify.app', 'http://localhost:3001'],
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  preflightContinue: false,
-  optionsSuccessStatus: 200
+  origin: 'https://curenetmedi.netlify.app',
+  methods: ['GET', 'POST', 'OPTIONS'], // Allow GET, POST, and OPTIONS requests
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers in the request
+  preflightContinue: false, // Handle preflight requests automatically
+  optionsSuccessStatus: 200, // Respond with 200 for OPTIONS requests
 };
 
 app.use(cors(corsOptions));
+
 app.use(express.json());
 
 // Initialize Gemini API (Google Generative AI)
