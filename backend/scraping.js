@@ -55,7 +55,8 @@ const verifyChromeInstallation = async () => {
         '/usr/bin/google-chrome',
         '/usr/bin/google-chrome-stable',
         '/opt/google/chrome/chrome',
-        '/opt/google/chrome/google-chrome'
+        '/opt/google/chrome/google-chrome',
+        '/opt/render/.cache/puppeteer/chrome/chrome'
       ];
       
       for (const path of possiblePaths) {
@@ -77,10 +78,19 @@ const verifyChromeInstallation = async () => {
     const stats = fs.statSync(PUPPETEER_OPTIONS.executablePath);
     console.log(`[SCRAPING] Chrome permissions: ${stats.mode.toString(8)}`);
     
+    // Try to get Chrome version
+    try {
+      const { execSync } = require('child_process');
+      const version = execSync(`${PUPPETEER_OPTIONS.executablePath} --version`).toString();
+      console.log('[SCRAPING] Chrome version from command:', version);
+    } catch (error) {
+      console.error('[SCRAPING] Error getting Chrome version:', error.message);
+    }
+    
     console.log('[SCRAPING] Attempting to launch Chrome...');
     const browser = await puppeteer.launch(PUPPETEER_OPTIONS);
     const version = await browser.version();
-    console.log('[SCRAPING] Chrome version:', version);
+    console.log('[SCRAPING] Chrome version from Puppeteer:', version);
     
     console.log('[SCRAPING] Testing Chrome functionality...');
     const page = await browser.newPage();

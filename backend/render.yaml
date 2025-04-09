@@ -3,6 +3,9 @@ services:
     name: curenet-backend
     env: node
     buildCommand: |
+      #!/bin/bash
+      set -e
+      
       echo "=== Starting build process ==="
       
       # Install Chrome dependencies
@@ -34,6 +37,15 @@ services:
       ln -sf /usr/bin/google-chrome /opt/render/.cache/puppeteer/chrome/chrome
       chmod -R o+rx /opt/render/.cache/puppeteer
       ls -la /opt/render/.cache/puppeteer/chrome
+      
+      # Verify Chrome installation
+      echo "=== Verifying Chrome installation ==="
+      if [ -f "/usr/bin/google-chrome" ]; then
+        echo "Chrome found at /usr/bin/google-chrome"
+        /usr/bin/google-chrome --version
+      else
+        echo "Chrome not found at /usr/bin/google-chrome"
+      fi
       
       # Install npm dependencies
       echo "=== Installing npm dependencies ==="
