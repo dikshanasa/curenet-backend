@@ -401,32 +401,41 @@ async function summarizeTopChunks(scoredChunks, topN = 10) {
     return [];
   }
 
-  console.log(`[RAGMODEL] Summarizing top ${topN} chunks...`);
+  console.log(`[RAGMODEL] Starting summary generation for top ${topN} chunks...`);
   const topChunks = scoredChunks.slice(0, topN);
   const summaries = [];
 
-  for (const { chunk } of topChunks) {
+  for (let i = 0; i < topChunks.length; i++) {
     try {
-      const summary = await generateSummary(chunk);
-      if (summary) summaries.push(summary);
+      console.log(`[RAGMODEL] Generating summary for chunk ${i + 1}/${topN}`);
+      const summary = await generateSummary(topChunks[i].chunk);
+      if (summary) {
+        console.log(`[RAGMODEL] Successfully generated summary for chunk ${i + 1}`);
+        summaries.push(summary);
+      }
     } catch (error) {
-      console.error('[RAGMODEL] Error summarizing chunk:', error);
+      console.error(`[RAGMODEL] Error summarizing chunk ${i + 1}:`, error);
       // Add original chunk as fallback
-      summaries.push(chunk);
+      summaries.push(topChunks[i].chunk);
     }
   }
 
+  console.log(`[RAGMODEL] Completed summary generation. Generated ${summaries.length} summaries`);
   return summaries;
 }
 
 async function generateSummary(chunk) {
   try {
+    console.log('[RAGMODEL] Initializing Gemini model for summary generation');
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const prompt = `Summarize the following medical text in 2-3 sentences, focusing on key information about treatments, symptoms, or medical conditions. Keep the summary concise and factual:\n\n${chunk}`;
     
+    console.log('[RAGMODEL] Generating summary with Gemini');
     const result = await rateLimitedGenerateContent(prompt);
     const response = await result.response;
-    return response.text();
+    const summary = response.text();
+    console.log(`[RAGMODEL] Generated summary length: ${summary.length} characters`);
+    return summary;
   } catch (error) {
     console.error('[RAGMODEL] Error in summary generation:', error);
     // Return a simple summary based on the first few sentences
@@ -541,7 +550,7 @@ async function generateAnswer(query, context, isFullContext = false) {
     throw new Error('Invalid input for answer generation');
   }
 
-  console.log(`[RAGMODEL] Generating AI answer using ${isFullContext ? 'full context' : 'megachunk'}`);
+  console.log(`[RAGMODEL] Starting answer generation using ${isFullContext ? 'full context' : 'megachunk'}`);
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   const prompt = `As a medical information assistant, provide a comprehensive and accurate answer to the query based on the following context. 
@@ -556,6 +565,7 @@ Provide a clear, structured answer that directly addresses the query. Include on
 Answer:`;
 
   try {
+    console.log('[RAGMODEL] Generating answer with Gemini');
     const result = await model.generateContent({
       contents: [{ parts: [{ text: prompt }]}],
       generationConfig: {
@@ -568,7 +578,7 @@ Answer:`;
 
     const response = await result.response;
     const answer = response.text();
-    console.log(`[RAGMODEL] Generated answer length: ${answer.length} characters`);
+    console.log(`[RAGMODEL] Successfully generated answer of length ${answer.length} characters`);
     return answer;
   } catch (error) {
     console.error('[RAGMODEL] Error generating answer:', error);
