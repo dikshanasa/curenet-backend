@@ -9,6 +9,8 @@ services:
       echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
       apt-get update
       apt-get install -y google-chrome-stable
+      mkdir -p /opt/render/.cache/puppeteer/chrome
+      ln -s /usr/bin/google-chrome /opt/render/.cache/puppeteer/chrome/chrome
       npm install
     startCommand: node server.js
     envVars:

@@ -12,7 +12,8 @@ const PUPPETEER_OPTIONS = {
     '--disable-gpu',
     '--window-size=1920x1080'
   ],
-  headless: 'new'
+  headless: 'new',
+  executablePath: '/usr/bin/google-chrome'
 };
 
 const getSearchResults = async (query, location) => {
@@ -49,10 +50,23 @@ const getArticleContent = async (url) => {
     browser = await puppeteer.launch(PUPPETEER_OPTIONS);
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-    await page.goto(url, { 
-      waitUntil: 'networkidle0',
-      timeout: 30000 
-    });
+    
+    // Add timeout and retry logic
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        await page.goto(url, { 
+          waitUntil: 'networkidle0',
+          timeout: 30000 
+        });
+        break;
+      } catch (error) {
+        retries--;
+        if (retries === 0) throw error;
+        console.log(`[SCRAPING] Retry ${3 - retries} for ${url}`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
 
     const content = await page.evaluate(() => {
       // Remove script and style elements
