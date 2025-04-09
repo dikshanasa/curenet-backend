@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# TensorFlow binaries
+*.dylib
+**/tfjs-node/deps/
+
+# Cache and logs
+.cache/
+.cache/puppeteer/
+**/.cache/
+*.log
+
+# Puppeteer
+chrome-headless-shell*
+**/chrome-headless-shell/
+
+# OS files
+.DS_Store
