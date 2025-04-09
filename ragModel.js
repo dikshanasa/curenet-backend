@@ -227,6 +227,22 @@ function chunkText(text, maxLength = 3000) {
   return chunks;
 }
 
+// Function to generate content with Gemini
+async function generateContent(prompt) {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result = await model.generateContent({
+      contents: [{ parts: [{ text: prompt }]}],
+      generationConfig: GENERATION_CONFIG,
+      safetySettings: SAFETY_SETTINGS
+    });
+    return result;
+  } catch (error) {
+    console.error('[RAGMODEL] Error generating content:', error);
+    throw error;
+  }
+}
+
 // Rate limiting for Gemini API
 const RATE_LIMIT = {
   requestsPerMinute: 15,
