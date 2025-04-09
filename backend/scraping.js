@@ -10,14 +10,9 @@ const PUPPETEER_OPTIONS = {
     '--disable-dev-shm-usage',
     '--disable-accelerated-2d-canvas',
     '--disable-gpu',
-    '--window-size=1920x1080',
-    '--single-process',
-    '--no-zygote',
-    '--disable-extensions',
-    '--disable-software-rasterizer'
+    '--window-size=1920x1080'
   ],
-  headless: 'new',
-  executablePath: '/usr/bin/google-chrome'
+  headless: 'new'
 };
 
 const getSearchResults = async (query, location) => {
