@@ -170,11 +170,36 @@ function preprocessText(text) {
   }
 
   console.log('[RAGMODEL] Preprocessing text...');
-  const cleanedText = text
+  
+  // First, remove HTML tags and decode HTML entities
+  let cleanedText = text
+    .replace(/<[^>]*>/g, ' ') // Remove HTML tags
+    .replace(/&nbsp;/g, ' ') // Replace non-breaking spaces
+    .replace(/&[^;]+;/g, ' ') // Replace other HTML entities
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+
+  // Remove navigation, menus, and other common web elements
+  cleanedText = cleanedText
     .replace(/Navigation[\s\S]*?(Menu|Search)/gi, '')
     .replace(/\b(Privacy Policy|Terms & Conditions|Legal|Contact Us|About Us|Advertisements)\b/gi, '')
+    .replace(/\b(Copyright|All Rights Reserved|©)\b/gi, '')
+    .replace(/\b(Home|Back|Next|Previous|Close|Menu|Search|Login|Sign Up)\b/gi, '')
+    .replace(/\[.*?\]/g, '') // Remove text in square brackets
+    .replace(/\(.*?\)/g, '') // Remove text in parentheses
+    .replace(/\s+/g, ' ') // Normalize whitespace again
+    .trim();
+
+  // Remove special characters but keep basic punctuation and medical terms
+  cleanedText = cleanedText
+    .replace(/[^\w\s.,!?\-()/]/g, '') // Keep basic punctuation and medical terms
+    .replace(/\s+/g, ' ') // Final whitespace normalization
+    .trim();
+
+  // Remove any remaining HTML-like content
+  cleanedText = cleanedText
+    .replace(/DOCTYPE|html|head|body|meta|link|script|style|div|span|class|id|src|href|alt|title/gi, '')
     .replace(/\s+/g, ' ')
-    .replace(/[^\w\s.,!?-]/g, '') // Remove special characters except basic punctuation
     .trim();
 
   console.log(`[RAGMODEL] Preprocessed text length: ${cleanedText.length}`);
