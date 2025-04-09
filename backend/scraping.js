@@ -1,5 +1,20 @@
 const axios = require('axios');
 const puppeteer = require('puppeteer');
+const { GOOGLE_API_KEY, GOOGLE_CSE_ID } = require('./utils/config');
+
+// Configure Puppeteer for Render
+const PUPPETEER_OPTIONS = {
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--disable-gpu',
+    '--window-size=1920x1080',
+  ],
+  headless: 'new',
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
+};
 
 const getSearchResults = async (query, location) => {
   try {
@@ -32,24 +47,7 @@ const getArticleContent = async (url) => {
   try {
     console.log(`[SCRAPING] Fetching content from URL: ${url}`);
 
-    browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--single-process',
-        '--no-zygote',
-        '--disable-extensions',
-        '--disable-software-rasterizer',
-        '--disable-features=site-per-process',
-        '--disable-features=IsolateOrigins',
-        '--disable-site-isolation-trials'
-      ],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-    });
-
+    browser = await puppeteer.launch(PUPPETEER_OPTIONS);
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
     await page.goto(url, { 
