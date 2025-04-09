@@ -329,42 +329,46 @@ async function processBatch(chunks, queryEmbedding, startIndex, batchSize, curre
 }
 
 async function scoreChunksByQuery(chunks, query) {
-  if (!sentenceEncoder) {
-    await loadModel();
+  console.log('[RAGMODEL] Starting scoring for', chunks.length, 'chunks');
+  const startTime = Date.now();
+  
+  // Get query embedding
+  const queryStart = Date.now();
+  const queryEmbedding = await sentenceEncoder.embed([query]);
+  console.log(`[RAGMODEL] Query embedding took ${Date.now() - queryStart}ms`);
+  
+  // Process chunks in batches
+  const batchSize = 12;
+  const scoredChunks = [];
+  let processedChunks = 0;
+  
+  for (let i = 0; i < chunks.length; i += batchSize) {
+    const batchStart = Date.now();
+    const batch = chunks.slice(i, i + batchSize);
+    console.log(`[RAGMODEL] Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(chunks.length/batchSize)}`);
+    
+    const batchScores = await processBatch(batch, queryEmbedding, i, batchSize, query);
+    scoredChunks.push(...batchScores);
+    
+    processedChunks += batch.length;
+    const batchTime = Date.now() - batchStart;
+    const estimatedTotalTime = (batchTime / batch.length) * chunks.length;
+    const remainingTime = estimatedTotalTime - (Date.now() - startTime);
+    
+    console.log(`[RAGMODEL] Batch ${Math.floor(i/batchSize) + 1} completed in ${batchTime}ms`);
+    console.log(`[RAGMODEL] Progress: ${processedChunks}/${chunks.length} chunks (${Math.round((processedChunks/chunks.length)*100)}%)`);
+    console.log(`[RAGMODEL] Estimated remaining time: ${Math.round(remainingTime/1000)}s`);
   }
   
-  console.log(`[RAGMODEL] Starting scoring for ${chunks.length} chunks`);
+  // Sort chunks by score
+  const sortStart = Date.now();
+  scoredChunks.sort((a, b) => b.score - a.score);
+  console.log(`[RAGMODEL] Sorting took ${Date.now() - sortStart}ms`);
   
-  try {
-    // Get query embedding
-    const queryEmbedding = await sentenceEncoder.embed([query]);
-    
-    // Process chunks in batches
-    const batchSize = 12;
-    const scores = [];
-    
-    for (let i = 0; i < chunks.length; i += batchSize) {
-      const batchScores = await processBatch(chunks, queryEmbedding, i, batchSize, query);
-      scores.push(...batchScores);
-    }
-    
-    // Sort by score
-    return scores.sort((a, b) => b.score - a.score);
-  } catch (error) {
-    console.error('[RAGMODEL] Error in chunk scoring:', error);
-    console.log('[RAGMODEL] Using fallback scoring method...');
-    
-    // Fallback to simple keyword matching
-    return chunks.map(chunk => {
-      const queryWords = new Set(query.toLowerCase().split(/\W+/).filter(Boolean));
-      const chunkWords = new Set(chunk.toLowerCase().split(/\W+/).filter(Boolean));
-      const matchingWords = [...queryWords].filter(word => chunkWords.has(word));
-      return {
-        chunk,
-        score: matchingWords.length / Math.max(queryWords.size, 1)
-      };
-    }).sort((a, b) => b.score - a.score);
-  }
+  const totalTime = Date.now() - startTime;
+  console.log(`[RAGMODEL] Total scoring time: ${totalTime}ms (${Math.round(totalTime/1000)}s)`);
+  
+  return scoredChunks;
 }
 
 function fallbackScoring(chunks, query) {
