@@ -163,8 +163,12 @@ function enhanceQueryWithContext(query) {
   return query;
 }
 
+// Modern utility functions to replace deprecated ones
+const isNullOrUndefined = (value) => value === null || value === undefined;
+const isArray = (value) => Array.isArray(value);
+
 function preprocessText(text) {
-  if (!text || typeof text !== 'string') {
+  if (isNullOrUndefined(text) || typeof text !== 'string') {
     console.warn('[RAGMODEL] Invalid text input for preprocessing');
     return '';
   }
@@ -210,8 +214,11 @@ function preprocessText(text) {
   return cleanedText;
 }
 
-function chunkText(text, maxLength = 3000) {
-  if (!text) return [];
+function chunkText(text, maxLength = 1000) {
+  if (isNullOrUndefined(text)) {
+    console.warn('[RAGMODEL] Invalid text input for chunking');
+    return [];
+  }
   
   console.log('[RAGMODEL] Chunking content...');
   const chunks = [];
@@ -296,7 +303,12 @@ async function rateLimitedGenerateContent(prompt) {
 }
 
 // Optimized batch processing
-async function processBatch(chunks, queryEmbedding, startIndex, batchSize, currentQuery) {
+async function processBatch(chunks, queryEmbedding, startIndex, batchSize, query) {
+  if (!isArray(chunks) || chunks.length === 0) {
+    console.warn('[RAGMODEL] Invalid chunks input for batch processing');
+    return [];
+  }
+  
   const endIndex = Math.min(startIndex + batchSize, chunks.length);
   const batchChunks = chunks.slice(startIndex, endIndex);
   
@@ -313,7 +325,7 @@ async function processBatch(chunks, queryEmbedding, startIndex, batchSize, curre
     const semanticScore = tf.matMul(queryEmbedding, chunkEmbedding.transpose()).dataSync()[0];
     
     // Optimized keyword matching
-    const queryWords = new Set(currentQuery.toLowerCase().split(/\W+/).filter(Boolean));
+    const queryWords = new Set(query.toLowerCase().split(/\W+/).filter(Boolean));
     const chunkWords = new Set(chunk.toLowerCase().split(/\W+/).filter(Boolean));
     const matchingWords = [...queryWords].filter(word => chunkWords.has(word));
     const keywordScore = matchingWords.length / Math.max(queryWords.size, 1);
