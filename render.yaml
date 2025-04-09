@@ -9,9 +9,8 @@ services:
       echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
       apt-get update
       apt-get install -y google-chrome-stable
-      cd /opt/render/project/src
       npm install
-    startCommand: cd /opt/render/project/src && node server.js
+    startCommand: node server.js
     envVars:
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
         value: "true"
