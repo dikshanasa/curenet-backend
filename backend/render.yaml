@@ -18,8 +18,8 @@ services:
       # Create Chrome cache directory
       mkdir -p /opt/render/.cache/puppeteer/chrome
       
-      # Install Chrome for Puppeteer
-      npx puppeteer browsers install chrome@latest
+      # Install specific Chrome version for Puppeteer
+      npx puppeteer browsers install chrome@109.0.5414.120
       
       # Set up Chrome executable
       ln -sf /usr/bin/google-chrome /opt/render/.cache/puppeteer/chrome/chrome
@@ -39,6 +39,8 @@ services:
         value: /opt/render/.cache/puppeteer
       - key: PUPPETEER_EXECUTABLE_PATH
         value: /opt/render/.cache/puppeteer/chrome/chrome
+      - key: PUPPETEER_PRODUCT
+        value: chrome
     healthCheckPath: /health
     autoDeploy: true
     disk:

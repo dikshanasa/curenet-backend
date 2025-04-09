@@ -17,7 +17,10 @@ const PUPPETEER_OPTIONS = {
     '--single-process',
     '--no-zygote',
     '--no-first-run',
-    '--disable-extensions'
+    '--disable-extensions',
+    '--disable-software-rasterizer',
+    '--disable-features=TranslateUI',
+    '--disable-features=BlinkGenPropertyTrees'
   ],
   headless: 'new',
   executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || '/usr/bin/google-chrome',
@@ -33,6 +36,13 @@ const verifyChromeInstallation = async () => {
   try {
     console.log('[SCRAPING] Verifying Chrome installation...');
     console.log('[SCRAPING] Chrome path:', PUPPETEER_OPTIONS.executablePath);
+    
+    // Check if Chrome exists
+    const fs = require('fs');
+    if (!fs.existsSync(PUPPETEER_OPTIONS.executablePath)) {
+      console.error('[SCRAPING] Chrome executable not found at:', PUPPETEER_OPTIONS.executablePath);
+      return false;
+    }
     
     const browser = await puppeteer.launch(PUPPETEER_OPTIONS);
     const version = await browser.version();
