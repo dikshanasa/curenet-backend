@@ -13,10 +13,14 @@ const PUPPETEER_OPTIONS = {
     '--window-size=1920x1080',
     '--disable-web-security',
     '--disable-features=IsolateOrigins,site-per-process',
-    '--disable-site-isolation-trials'
+    '--disable-site-isolation-trials',
+    '--single-process',
+    '--no-zygote',
+    '--no-first-run',
+    '--disable-extensions'
   ],
   headless: 'new',
-  executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome',
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || '/usr/bin/google-chrome',
   ignoreHTTPSErrors: true,
   defaultViewport: {
     width: 1920,
@@ -27,7 +31,13 @@ const PUPPETEER_OPTIONS = {
 // Verify Chrome installation
 const verifyChromeInstallation = async () => {
   try {
+    console.log('[SCRAPING] Verifying Chrome installation...');
+    console.log('[SCRAPING] Chrome path:', PUPPETEER_OPTIONS.executablePath);
+    
     const browser = await puppeteer.launch(PUPPETEER_OPTIONS);
+    const version = await browser.version();
+    console.log('[SCRAPING] Chrome version:', version);
+    
     await browser.close();
     console.log('[SCRAPING] Chrome installation verified successfully');
     return true;
@@ -36,6 +46,9 @@ const verifyChromeInstallation = async () => {
     return false;
   }
 };
+
+// Initialize Chrome verification
+verifyChromeInstallation().catch(console.error);
 
 const getSearchResults = async (query, location) => {
   try {
