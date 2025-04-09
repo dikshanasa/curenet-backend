@@ -12,10 +12,12 @@ const PUPPETEER_OPTIONS = {
     '--disable-gpu',
     '--window-size=1920x1080',
     '--single-process',
-    '--no-zygote'
+    '--no-zygote',
+    '--disable-extensions',
+    '--disable-software-rasterizer'
   ],
   headless: 'new',
-  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome'
+  executablePath: '/usr/bin/google-chrome'
 };
 
 const getSearchResults = async (query, location) => {
