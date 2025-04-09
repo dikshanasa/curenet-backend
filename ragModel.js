@@ -576,7 +576,7 @@ Answer:`;
   }
 }
 
-const getModelResponse = async (question, fullContext) => {
+async function getModelResponse(question, fullContext) {
   try {
     console.log('\n[RAGMODEL] Starting new query processing...');
     console.log(`[RAGMODEL] Question: ${question}`);
@@ -595,17 +595,28 @@ const getModelResponse = async (question, fullContext) => {
     const scoredChunks = await scoreChunksByQuery(chunks, question);
     
     // Generate summaries and create megachunk
+    console.log('[RAGMODEL] Starting summary generation...');
     const summaries = await summarizeTopChunks(scoredChunks);
+    console.log(`[RAGMODEL] Generated ${summaries.length} summaries`);
+    
     const megaChunk = await createMegaChunk(summaries);
+    console.log(`[RAGMODEL] Created mega chunk of length ${megaChunk.length}`);
     
     // Check relevance and generate answer
+    console.log('[RAGMODEL] Checking relevance...');
     const isRelevant = await checkRelevance(question, megaChunk);
-    const contextToUse = isRelevant ? megaChunk : fullContext;
+    console.log(`[RAGMODEL] Relevance check result: ${isRelevant}`);
     
+    const contextToUse = isRelevant ? megaChunk : fullContext;
     console.log(`[RAGMODEL] Using ${isRelevant ? 'megachunk' : 'full context'} for answer generation`);
     
+    console.log('[RAGMODEL] Generating answer...');
     const answer = await generateAnswer(question, contextToUse, !isRelevant);
+    console.log(`[RAGMODEL] Generated answer length: ${answer.length}`);
+    
+    console.log('[RAGMODEL] Calculating confidence...');
     const confidence = await calculateConfidence(question, megaChunk, answer);
+    console.log(`[RAGMODEL] Confidence score: ${confidence}`);
 
     // Prepare response metadata
     const metadata = {
@@ -619,7 +630,7 @@ const getModelResponse = async (question, fullContext) => {
     console.log('[RAGMODEL] Response generated successfully');
     console.log('[RAGMODEL] Metadata:', metadata);
 
-    return {
+    const response = {
       question,
       answer,
       confidence,
@@ -627,11 +638,14 @@ const getModelResponse = async (question, fullContext) => {
       usedFullContext: !isRelevant
     };
 
+    console.log('[RAGMODEL] Final response:', JSON.stringify(response, null, 2));
+    return response;
+
   } catch (error) {
     console.error('[RAGMODEL] Error in pipeline:', error);
     throw new Error(`Failed to process query: ${error.message}`);
   }
-};
+}
 
 // Export the main function and utility functions for testing
 module.exports = getModelResponse;
